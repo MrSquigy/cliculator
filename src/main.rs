@@ -15,16 +15,16 @@ fn calculate(expression: &Vec<String>) -> f64 {
     for term in expression {
         if term.parse::<f64>().is_ok() {
             stack.push(term.parse().unwrap());
-        } else if term.len() == 1 {
+        } else if term.len() == 1 && PRECEDENCE.contains_key(&term.chars().last().unwrap()) {
             let operation = &term.chars().last().unwrap();
-            if PRECEDENCE.contains_key(operation) {
-                if stack.len() < 2 {
-                    return std::f64::NAN;
-                }
-                let oper2 = stack.pop().unwrap();
-                let oper1 = stack.pop().unwrap();
-                stack.push(do_operation(oper1, oper2, operation));
+            if stack.len() < 2 {
+                return std::f64::NAN;
             }
+            let oper2 = stack.pop().unwrap();
+            let oper1 = stack.pop().unwrap();
+            stack.push(do_operation(oper1, oper2, operation));
+        } else {
+            println!("Undefined term '{}'", term);
         }
     }
 
@@ -68,7 +68,7 @@ fn to_postfix(expression: &String) -> String {
     for c in expression.chars() {
         if c == '(' {
             stack.push(c);
-        } else if c.is_alphanumeric() {
+        } else if c.is_alphanumeric() || c == '$' {
             postfix.push(c);
         } else if PRECEDENCE.contains_key(&c) {
             postfix.push(' ');
@@ -93,37 +93,51 @@ fn to_postfix(expression: &String) -> String {
 }
 
 fn tokenize_expression(expression: &String) -> Vec<String> {
-    let tokenized_expression;
-    let expression = to_postfix(expression);
-    tokenized_expression = {
-        let mut expr = Vec::<String>::new();
-        let tokens = expression.split(" ");
-        for token in tokens {
-            expr.push(token.into());
+    let mut expr = Vec::<String>::new();
+    let tokens = expression.split(" ");
+    for token in tokens {
+        expr.push(token.into());
+    }
+    expr
+}
+
+fn insert_vars(expression: &Vec<String>, history: &Vec<(String, f64)>) -> Vec<String> {
+    let mut expr = Vec::new();
+
+    for term in expression {
+        if term.starts_with("$") {
+            let idx = term.get(1..term.len()).unwrap();
+            let idx = idx.parse::<usize>().unwrap();
+            expr.push(history[idx].1.to_string());
+        } else {
+            expr.push(term.clone());
         }
-        expr
-    };
-    tokenized_expression
+    }
+
+    expr
 }
 
 fn main() {
-    let mut expression_history: Vec<String> = Vec::new();
+    let mut expression_history = Vec::<(String, f64)>::new();
 
     loop {
         // Get next expression
         print!("[{}]: ", expression_history.len());
         io::stdout().flush().unwrap();
-        expression_history.push(get_next_expression());
-        let expression = expression_history.last().unwrap();
+        let expression_text = get_next_expression();
 
         // Handle exit requests
-        if expression == "exit" || expression == "quit" || expression == "q" || expression == "e" {
-            break;
+        match expression_text.to_lowercase().as_str() {
+            "exit" | "e" | "quit" | "q" => break,
+            _ => {}
         }
 
         // Handle expression
-        let expression = tokenize_expression(expression);
+        let expression = to_postfix(&expression_text);
+        let expression = tokenize_expression(&expression);
+        let expression = insert_vars(&expression, &expression_history);
         let answer = calculate(&expression);
+        expression_history.push((expression_text, answer));
         println!("[{}]: {}\n", expression_history.len() - 1, answer);
     }
 }
