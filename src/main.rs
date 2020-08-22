@@ -106,9 +106,14 @@ fn insert_vars(expression: &Vec<String>, history: &Vec<(String, f64)>) -> Vec<St
 
     for term in expression {
         if term.starts_with("$") {
-            let idx = term.get(1..term.len()).unwrap();
-            let idx = idx.parse::<usize>().unwrap();
-            expr.push(history[idx].1.to_string());
+            if term.len() == 1 {
+                // Reference last calculation
+                expr.push(history.last().unwrap().1.to_string());
+            } else {
+                let idx = term.get(1..term.len()).unwrap();
+                let idx = idx.parse::<usize>().unwrap();
+                expr.push(history[idx].1.to_string());
+            }
         } else {
             expr.push(term.clone());
         }
